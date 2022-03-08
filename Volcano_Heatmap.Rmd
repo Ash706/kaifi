@@ -1,0 +1,89 @@
+---
+title: "Volcano plots and heatmaps"
+author: "Kaifi"
+date: "3/8/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R packages
+```{r}
+renv::install("knitr")
+renv::install("readxl")
+renv::install("bioc::EnhancedVolcano")
+```
+
+
+## Import data 
+
+This part of the code is going to import the data.
+
+```{r}
+library(readxl)
+Coagulation_UN_stats <-  read_excel("Coagulation.UN_stats.xlsx", 
+    col_types = c("text", "text", "text", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric"))
+Coag_meta_data <- read_excel("Coagulation.UN_stats.xlsx", sheet = 2, trim_ws = TRUE)
+Coag_meta_data$sample <- stringi::stri_trim_right(Coag_meta_data$sample)
+```
+
+
+## Volcano plot
+
+```{r}
+library(EnhancedVolcano) # Publication-ready volcano plots with enhanced colouring andlabeling
+Coagulation_UN_stats_noNA <- Coagulation_UN_stats[which(!is.na(Coagulation_UN_stats$`UC-UT_PValue` )),]
+
+ev <- EnhancedVolcano(Coagulation_UN_stats_noNA,
+  lab = Coagulation_UN_stats_noNA$Protein.IDs,
+  x = "UC-UT_log2FoldChange",
+  y = "UC-UT_PValue" ,
+  pCutoff = 0.05,
+  labSize = 2,
+  ylim = c(0,  3),
+  FCcutoff = 0,
+ # xlim = c(-2.5,2.5) , 
+   #legendLabels = c("Not significant", "", "adj. P val < 0.05", "adj Pval < 0.05 & effect size >/< 0.01"),
+# transcriptPointSize = 1.5,
+  title = "Coagulated vs. fresh",
+  subtitle = "tissue: haemolymph",
+  boxedLabels = FALSE,
+  shadeBins = 4,
+  legendLabSize = 10
+)
+ggsave(ev, filename = "./Coagulated_vs_fresh_volcano.png")
+
+```
+
+## Heatmap
+
+```{r}
+### Heatmap for significantly DE proteins
+sig_rand <- Coagulation_UN_stats_noNA[Coagulation_UN_stats_noNA$`UC-UT_PValue` < 0.05, ]
+#intData <- assays(data_24h)$loess[sig_rand,]
+intData <- sig_rand[, Coag_meta_data$sample] |> as.matrix()
+rownames(intData) <- sig_rand$Protein.IDs
+group <- Coag_meta_data$group
+names(group) <- Coag_meta_data$sample
+png("./Coagulated_vs_fresh_HeatMap_group.png", units = "cm", height = 15, width = 25,res = 300)
+pheatmap::pheatmap(intData, labels_row = sig_rand$Protein.IDs,
+         display_numbers=FALSE, 
+         fontsize=7, 
+         cluster_cols=TRUE, 
+         cluster_rows = FALSE, 
+         scale = "row",
+         labels_col =  Coag_meta_data$group
+         #annotation_col = group
+        )
+dev.off()
+```
+
+
